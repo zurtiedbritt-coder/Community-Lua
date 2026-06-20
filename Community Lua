@@ -1,0 +1,576 @@
+-- VoidRivals Minimal - Voidspam & Orbit Only (No-Limits Drag) + XYZ HUD + Neon Toggle Button
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- ===== CONFIG =====
+local VOIDSPAM_KEYBIND = Enum.KeyCode.P
+local ORBIT_KEYBIND = Enum.KeyCode.O
+local UI_TOGGLE_KEY = Enum.KeyCode.RightShift
+
+-- ===== THEME =====
+local THEME = {
+    Background = Color3.fromRGB(15, 20, 35),
+    Surface = Color3.fromRGB(25, 35, 55),
+    On = Color3.fromRGB(0, 200, 255),
+    Off = Color3.fromRGB(60, 70, 90),
+    Ball = Color3.fromRGB(240, 245, 255),
+    Text = Color3.fromRGB(230, 235, 250),
+    Stroke = Color3.fromRGB(0, 150, 220),
+    AxisX = Color3.fromRGB(255, 90, 110),
+    AxisY = Color3.fromRGB(120, 230, 140),
+    AxisZ = Color3.fromRGB(110, 170, 255),
+    NeonBlue = Color3.fromRGB(0, 200, 255),
+    NeonGlow = Color3.fromRGB(0, 150, 255),
+}
+
+-- ===== HELPERS =====
+local function getRoot()
+    local char = player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHumanoid()
+    local char = player.Character
+    return char and char:FindFirstChild("Humanoid")
+end
+
+local function getHead()
+    local char = player.Character
+    return char and char:FindFirstChild("Head")
+end
+
+local function getTorso()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+end
+
+-- ===== VOIDSPAM =====
+local voidspamming = false
+local voidspamConn, bodyVel, shakeConn
+local camera = workspace.CurrentCamera
+
+local function createBodyVelocity()
+    pcall(function()
+        if bodyVel then bodyVel:Destroy() end
+        local root = getRoot()
+        if not root then return end
+        bodyVel = Instance.new("BodyVelocity")
+        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVel.Velocity = Vector3.zero
+        bodyVel.P = 999999
+        bodyVel.Parent = root
+    end)
+end
+
+local function destroyBodyVelocity()
+    pcall(function()
+        if bodyVel then
+            bodyVel:Destroy()
+            bodyVel = nil
+        end
+    end)
+end
+
+local function doAntiHit()
+    pcall(function()
+        local head, torso, hrp = getHead(), getTorso(), getRoot()
+        if head and torso then
+            head.CFrame = torso.CFrame
+            head.Size = Vector3.new(0.1, 0.1, 0.1)
+            head.CanCollide = false
+        end
+        if hrp and torso then
+            hrp.CFrame = torso.CFrame
+            hrp.Size = Vector3.new(0.1, 0.1, 0.1)
+            hrp.CanCollide = false
+        end
+    end)
+end
+
+local function doVoidspam()
+    pcall(function()
+        local root = getRoot()
+        local humanoid = getHumanoid()
+        if not root or not humanoid then return end
+
+        for _, state in ipairs(Enum.HumanoidStateType:GetEnumItems()) do
+            humanoid:SetStateEnabled(state, false)
+        end
+
+        root.CFrame = CFrame.new(
+            math.random(-9999999, 9999999),
+            math.random(-9999999, 9999999),
+            math.random(-9999999, 9999999)
+        )
+        root.AssemblyLinearVelocity = Vector3.new(
+            math.random(-99999999, 99999999),
+            math.random(-99999999, 99999999),
+            math.random(-99999999, 99999999)
+        )
+        for _, part in ipairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.CFrame = root.CFrame * CFrame.new(math.random(-50, 50), math.random(-50, 50), math.random(-50, 50))
+                part.Size = Vector3.new(math.random(0.01, 20), math.random(0.01, 20), math.random(0.01, 20))
+            end
+        end
+        if bodyVel then
+            bodyVel.Velocity = Vector3.new(
+                math.random(-9999999, 9999999),
+                math.random(-9999999, 9999999),
+                math.random(-9999999, 9999999)
+            )
+        end
+        doAntiHit()
+    end)
+end
+
+local function startVoidspam()
+    if voidspamming then return end
+    voidspamming = true
+    createBodyVelocity()
+
+    shakeConn = RunService.RenderStepped:Connect(function()
+        if not voidspamming then return end
+        camera.CFrame = camera.CFrame * CFrame.Angles(
+            math.rad(math.random(-10, 10)),
+            math.rad(math.random(-10, 10)),
+            math.rad(math.random(-10, 10))
+        )
+    end)
+
+    voidspamConn = RunService.Heartbeat:Connect(doVoidspam)
+end
+
+local function stopVoidspam()
+    voidspamming = false
+    if voidspamConn then
+        voidspamConn:Disconnect()
+        voidspamConn = nil
+    end
+    if shakeConn then
+        shakeConn:Disconnect()
+        shakeConn = nil
+    end
+    destroyBodyVelocity()
+
+    pcall(function()
+        local root = getRoot()
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+            root.Size = Vector3.new(2, 2, 1)
+        end
+        for _, part in ipairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if part.Name == "Head" then
+                    part.Size = Vector3.new(2, 1, 1)
+                elseif part.Name == "Torso" or part.Name == "UpperTorso" then
+                    part.Size = Vector3.new(2, 2, 1)
+                elseif part.Name:find("Arm") then
+                    part.Size = Vector3.new(1, 2, 1)
+                elseif part.Name:find("Leg") then
+                    part.Size = Vector3.new(1, 2, 1)
+                end
+                part.CanCollide = true
+            end
+        end
+        local humanoid = getHumanoid()
+        if humanoid then
+            for _, state in ipairs(Enum.HumanoidStateType:GetEnumItems()) do
+                humanoid:SetStateEnabled(state, true)
+            end
+        end
+    end)
+end
+
+-- ===== ORBIT =====
+local orbiting = false
+local orbitConn, orbitAngle = nil, 0
+
+local function getNearestRoot()
+    local myRoot = getRoot()
+    if not myRoot then return nil end
+    local closest, dist = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local theirRoot = p.Character:FindFirstChild("HumanoidRootPart")
+            if theirRoot then
+                local d = (theirRoot.Position - myRoot.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = theirRoot
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function startOrbit()
+    if orbiting then return end
+    orbiting = true
+    orbitConn = RunService.Heartbeat:Connect(function(dt)
+        local myRoot = getRoot()
+        local target = getNearestRoot()
+        if not myRoot or not target then return end
+        orbitAngle = orbitAngle + 20 * dt
+        local offset = Vector3.new(math.cos(orbitAngle) * 5, 1.5, math.sin(orbitAngle) * 5)
+        myRoot.CFrame = CFrame.lookAt(target.Position + offset, target.Position)
+        myRoot.AssemblyLinearVelocity = Vector3.zero
+    end)
+end
+
+local function stopOrbit()
+    orbiting = false
+    if orbitConn then
+        orbitConn:Disconnect()
+        orbitConn = nil
+    end
+end
+
+-- ===== UI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "VoidMini"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
+screenGui.ClipToDeviceSafeArea = false
+pcall(function() screenGui.Parent = player:WaitForChild("PlayerGui") end)
+
+-- ===== NEON TOGGLE BUTTON (CL) =====
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "CLToggle"
+toggleButton.Size = UDim2.fromOffset(50, 50)
+toggleButton.Position = UDim2.new(0, 20, 0.5, -25)
+toggleButton.BackgroundColor3 = THEME.NeonBlue
+toggleButton.Text = "CL"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 18
+toggleButton.AutoButtonColor = false
+toggleButton.Parent = screenGui
+
+-- Corner radius for square with slight round
+local tbCorner = Instance.new("UICorner")
+tbCorner.CornerRadius = UDim.new(0, 8)
+tbCorner.Parent = toggleButton
+
+-- Main neon stroke
+local tbStroke = Instance.new("UIStroke")
+tbStroke.Color = THEME.NeonGlow
+tbStroke.Thickness = 2
+tbStroke.Transparency = 0.2
+tbStroke.Parent = toggleButton
+
+-- Outer glow effect (using a frame behind)
+local glowFrame = Instance.new("Frame")
+glowFrame.Name = "Glow"
+glowFrame.Size = UDim2.new(1, 8, 1, 8)
+glowFrame.Position = UDim2.fromOffset(-4, -4)
+glowFrame.BackgroundColor3 = THEME.NeonBlue
+glowFrame.BackgroundTransparency = 0.9
+glowFrame.ZIndex = -1
+glowFrame.Parent = toggleButton
+
+local gfCorner = Instance.new("UICorner")
+gfCorner.CornerRadius = UDim.new(0, 12)
+gfCorner.Parent = glowFrame
+
+-- Pulsing animation for glow
+local glowTween = TweenService:Create(glowFrame, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+    BackgroundTransparency = 0.7
+})
+glowTween:Play()
+
+-- Hover/Touch effects
+local function onToggleHover()
+    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
+        BackgroundColor3 = Color3.fromRGB(50, 220, 255),
+        Size = UDim2.fromOffset(52, 52),
+        Position = UDim2.new(0, 19, 0.5, -26)
+    }):Play()
+    TweenService:Create(tbStroke, TweenInfo.new(0.15), {
+        Thickness = 3,
+        Color = Color3.fromRGB(100, 230, 255)
+    }):Play()
+end
+
+local function onToggleLeave()
+    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
+        BackgroundColor3 = THEME.NeonBlue,
+        Size = UDim2.fromOffset(50, 50),
+        Position = UDim2.new(0, 20, 0.5, -25)
+    }):Play()
+    TweenService:Create(tbStroke, TweenInfo.new(0.15), {
+        Thickness = 2,
+        Color = THEME.NeonGlow
+    }):Play()
+end
+
+-- Mobile and desktop input support
+toggleButton.MouseEnter:Connect(onToggleHover)
+toggleButton.MouseLeave:Connect(onToggleLeave)
+
+-- ===== MAIN PANEL =====
+local panel = Instance.new("Frame")
+panel.Size = UDim2.fromOffset(220, 130)
+panel.Position = UDim2.new(0.5, -110, 0.5, -65)
+panel.BackgroundColor3 = THEME.Background
+panel.BorderSizePixel = 0
+panel.ClipsDescendants = false
+panel.Visible = false -- Start hidden, toggle with CL button
+panel.Parent = screenGui
+
+local pCorner = Instance.new("UICorner")
+pCorner.CornerRadius = UDim.new(0, 14)
+pCorner.Parent = panel
+
+local pStroke = Instance.new("UIStroke")
+pStroke.Color = THEME.Stroke
+pStroke.Thickness = 1.5
+pStroke.Transparency = 0.4
+pStroke.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundTransparency = 1
+title.Text = "VOID"
+title.TextColor3 = THEME.Text
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.Parent = panel
+
+-- ===== XYZ COORDS HUD (attached to side of panel) =====
+local coordsFrame = Instance.new("Frame")
+coordsFrame.Name = "CoordsHUD"
+coordsFrame.Size = UDim2.fromOffset(140, 96)
+coordsFrame.Position = UDim2.new(1, 8, 0, 17)
+coordsFrame.BackgroundColor3 = THEME.Background
+coordsFrame.BorderSizePixel = 0
+coordsFrame.Parent = panel
+
+local cCorner = Instance.new("UICorner")
+cCorner.CornerRadius = UDim.new(0, 12)
+cCorner.Parent = coordsFrame
+
+local cStroke = Instance.new("UIStroke")
+cStroke.Color = THEME.Stroke
+cStroke.Thickness = 1.5
+cStroke.Transparency = 0.4
+cStroke.Parent = coordsFrame
+
+local cTitle = Instance.new("TextLabel")
+cTitle.Size = UDim2.new(1, 0, 0, 20)
+cTitle.Position = UDim2.fromOffset(0, 4)
+cTitle.BackgroundTransparency = 1
+cTitle.Text = "COORDS"
+cTitle.TextColor3 = THEME.Text
+cTitle.Font = Enum.Font.GothamBold
+cTitle.TextSize = 11
+cTitle.Parent = coordsFrame
+
+local function makeAxisRow(letter, color, yPos)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -16, 0, 20)
+    row.Position = UDim2.fromOffset(8, yPos)
+    row.BackgroundTransparency = 1
+    row.Parent = coordsFrame
+
+    local tag = Instance.new("TextLabel")
+    tag.Size = UDim2.fromOffset(14, 20)
+    tag.BackgroundTransparency = 1
+    tag.Text = letter
+    tag.TextColor3 = color
+    tag.Font = Enum.Font.GothamBold
+    tag.TextSize = 12
+    tag.TextXAlignment = Enum.TextXAlignment.Left
+    tag.Parent = row
+
+    local val = Instance.new("TextLabel")
+    val.Name = "Val"
+    val.Size = UDim2.new(1, -18, 1, 0)
+    val.Position = UDim2.fromOffset(18, 0)
+    val.BackgroundTransparency = 1
+    val.Text = "0.00"
+    val.TextColor3 = THEME.Text
+    val.Font = Enum.Font.Code
+    val.TextSize = 12
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.Parent = row
+    return val
+end
+
+local xVal = makeAxisRow("X", THEME.AxisX, 26)
+local yVal = makeAxisRow("Y", THEME.AxisY, 48)
+local zVal = makeAxisRow("Z", THEME.AxisZ, 70)
+
+RunService.RenderStepped:Connect(function()
+    local root = getRoot()
+    if not root then
+        xVal.Text = "—"
+        yVal.Text = "—"
+        zVal.Text = "—"
+        return
+    end
+    local p = root.Position
+    xVal.Text = string.format("%.2f", p.X)
+    yVal.Text = string.format("%.2f", p.Y)
+    zVal.Text = string.format("%.2f", p.Z)
+end)
+
+-- Toggle factory
+local function createToggle(labelText, yPos, onCallback, offCallback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -24, 0, 36)
+    row.Position = UDim2.fromOffset(12, yPos)
+    row.BackgroundTransparency = 1
+    row.Parent = panel
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = THEME.Text
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local switch = Instance.new("TextButton")
+    switch.Size = UDim2.fromOffset(56, 26)
+    switch.Position = UDim2.new(1, -56, 0.5, -13)
+    switch.BackgroundColor3 = THEME.Off
+    switch.AutoButtonColor = false
+    switch.Text = ""
+    switch.Parent = row
+    
+    local sCorner = Instance.new("UICorner")
+    sCorner.CornerRadius = UDim.new(1, 0)
+    sCorner.Parent = switch
+    
+    local ball = Instance.new("Frame")
+    ball.Size = UDim2.fromOffset(20, 20)
+    ball.Position = UDim2.fromOffset(3, 3)
+    ball.BackgroundColor3 = THEME.Ball
+    ball.BorderSizePixel = 0
+    ball.Parent = switch
+    
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(1, 0)
+    bCorner.Parent = ball
+    
+    local state = false
+    local function setState(s)
+        state = s
+        local goalPos = s and UDim2.fromOffset(33, 3) or UDim2.fromOffset(3, 3)
+        local goalColor = s and THEME.On or THEME.Off
+        TweenService:Create(ball, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Position = goalPos}):Play()
+        TweenService:Create(switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundColor3 = goalColor}):Play()
+        if s then onCallback() else offCallback() end
+    end
+    switch.MouseButton1Click:Connect(function() setState(not state) end)
+    
+    -- Mobile touch support
+    switch.TouchTap:Connect(function() setState(not state) end)
+    
+    return setState
+end
+
+local setVoid = createToggle("Voidspam", 32, startVoidspam, stopVoidspam)
+local setOrbit = createToggle("Orbit", 78, function()
+    if voidspamming then setVoid(false) end
+    startOrbit()
+end, stopOrbit)
+
+-- Toggle panel visibility with CL button
+local panelVisible = false
+local function togglePanel()
+    panelVisible = not panelVisible
+    panel.Visible = panelVisible
+    
+    -- Animate button when panel opens/closes
+    if panelVisible then
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(100, 240, 255)
+        }):Play()
+    else
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = THEME.NeonBlue
+        }):Play()
+    end
+end
+
+-- FIXED: Connect the function, not the button instance
+toggleButton.MouseButton1Click:Connect(togglePanel)
+toggleButton.TouchTap:Connect(togglePanel)
+
+-- Keybinds
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == VOIDSPAM_KEYBIND then
+        setVoid(not voidspamming)
+    elseif input.KeyCode == ORBIT_KEYBIND then
+        setOrbit(not orbiting)
+    elseif input.KeyCode == UI_TOGGLE_KEY then
+        togglePanel()
+    end
+end)
+
+-- ===== NO-LIMITS DRAG =====
+local dragging = false
+local dragStart, startOffset = nil, nil
+
+local function getViewport()
+    return camera.ViewportSize
+end
+
+local function beginDrag(input)
+    dragging = true
+    dragStart = input.Position
+    local vp = getViewport()
+    local pos = panel.Position
+    local absX = pos.X.Scale * vp.X + pos.X.Offset
+    local absY = pos.Y.Scale * vp.Y + pos.Y.Offset
+    startOffset = Vector2.new(absX, absY)
+end
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        beginDrag(input)
+    end
+end)
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        beginDrag(input)
+    end
+end)
+
+-- Allow drag from coords HUD too
+coordsFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        beginDrag(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    local delta = input.Position - dragStart
+    panel.Position = UDim2.fromOffset(
+        startOffset.X + delta.X,
+        startOffset.Y + delta.Y
+    )
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+print("[Void] Loaded. [P] Voidspam | [O] Orbit | [RightShift] Toggle UI | [CL Button] Toggle UI (Mobile)")
